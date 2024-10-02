@@ -1,0 +1,50 @@
+apiVersion: apps/v1
+kind: Deployment #Тип объекта
+metadata:
+  name: test-mindbox
+  labels:
+    app: test-mindbox #метка для идентификации
+spec:
+  replicas: 3 #3 пода справляются с нагрузкой
+  selector:
+    matchLabels:
+        app: test-mindbox
+  template:
+    metadata:
+      labels:
+        app: test-mindbox
+    spec:
+      containers:
+        - name: test-mindbox-container
+          image: test-mindbox-image:version1
+          resources:
+            requests:
+              cpu: "0.1" #потребление ровное в районе 0.1 CPU
+              memory: "128Mi"  #памяти всегда “ровно” в районе 128M memory
+            limits:
+              cpu: "0.5"  #на первые запросы приложению требуется значительно больше ресурсов CPU
+              memory: "128Mi"
+            ports:
+              - containerPort: 80
+          readinessProbe: #как я понял - так проводится проверка готовности контейнера
+            httpGet:
+              path: /healthz
+              port: 80
+            initialDelaySeconds: 10  #приложение требует около 5-10 секунд для инициализации
+            periodSeconds: 5 #интервал между проверками
+          livenessProbe: #тут проверка что под живой, если нет то перезапуск
+            httpGet:
+              path: /healthz
+              port: 80
+            initialDelaySeconds: 15  #ожидание после старта
+            periodSeconds: 20  #проверка каждые 20сек
+      affinity: #тут указываются правила размещения подов
+        podAntiAffinity: #размещение одинаковых подов на разных нодах
+          requiredDuringSchedulingIgnoredDuringExecution: #запрет запуска одинаковых подов на одной ноде
+            - labelSelector: #поиск подов на которые накладываются эти правила
+                matchExpressions:
+                  - key: app
+                    operator: In
+                    values:
+                      - test-mindbox #поды с app=my-app следуют правилам
+              topologyKey: "kubernetes.io/hostname" #гарантирует распределение по разным нодам._.
